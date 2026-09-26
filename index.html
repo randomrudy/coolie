@@ -78,7 +78,7 @@
     border-radius:5px 12px 12px 5px;
     background:transparent;
   }
-  .card.open .cover{ transform:rotateY(-180deg); box-shadow:2px 12px 30px rgba(40,15,8,.3); }
+  .card.open .cover{ -webkit-transform:rotateY(-180deg); transform:rotateY(-180deg); box-shadow:2px 12px 30px rgba(40,15,8,.3); }
   .cover .face{
     position:absolute; inset:0; backface-visibility:hidden; -webkit-backface-visibility:hidden;
     border-radius:5px 12px 12px 5px; overflow:hidden;
@@ -91,8 +91,46 @@
   }
   .card.open .cover .front::after{ opacity:1; }
   .card.open .cover .front{ pointer-events:none; }
-  .cover .back{ transform:rotateY(180deg); background:var(--kraft-dark);
-    box-shadow:12px 18px 34px rgba(40,15,8,.34) inset; }
+  /* GitHub/mobile-safe 3D face handling.
+   Some compositors can ignore backface-visibility during a preserve-3d
+   rotation. Explicitly swap the two faces at the midpoint of the flip so
+   the front cover can never appear as a mirrored page after opening. */
+.cover,
+.cover .face{
+    -webkit-transform-style:preserve-3d;
+    transform-style:preserve-3d;
+}
+.cover .face{
+    -webkit-backface-visibility:hidden !important;
+    backface-visibility:hidden !important;
+    will-change:transform,opacity;
+}
+.cover .front{
+    -webkit-transform:rotateY(0deg) translateZ(.1px);
+    transform:rotateY(0deg) translateZ(.1px);
+    opacity:1;
+    visibility:visible;
+    transition:opacity .001s linear .56s, visibility 0s linear .56s;
+}
+.cover .back{
+    -webkit-transform:rotateY(180deg) translateZ(.1px);
+    transform:rotateY(180deg) translateZ(.1px);
+    background:var(--kraft-dark);
+    box-shadow:12px 18px 34px rgba(40,15,8,.34) inset;
+    opacity:0;
+    visibility:hidden;
+    transition:opacity .001s linear .56s, visibility 0s linear .56s;
+}
+.card.open .cover .front{
+    opacity:0;
+    visibility:hidden;
+    transition:opacity .001s linear .56s, visibility 0s linear .56s;
+}
+.card.open .cover .back{
+    opacity:1;
+    visibility:visible;
+    transition:opacity .001s linear .56s, visibility 0s linear .56s;
+}
 
   /* open / hint tab on the closed cover */
   .opentab{
