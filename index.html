@@ -557,8 +557,9 @@
 
   let audioCtx=null, analyser=null, timeData=null, freqData=null, rafId=null;
   let running=false, extinguished=false, blowMs=0, lastT=0, level=0;
-  let holdActive=false, micReady=false, noiseFloor=.025, calibrationUntil=0;
-  const NEED=650;
+  let holdActive=false, micReady=false, noiseFloor=.012, calibrationUntil=0;
+  /* Responsive but still long enough to avoid a click triggering it. */
+  const NEED=900;
 
   micBtn.addEventListener('click', enableMic);
 
@@ -578,16 +579,16 @@
       const src=audioCtx.createMediaStreamSource(stream);
       analyser=audioCtx.createAnalyser();
       analyser.fftSize=2048;
-      analyser.smoothingTimeConstant=.38;
-      analyser.minDecibels=-90;
-      analyser.maxDecibels=-10;
+      analyser.smoothingTimeConstant=.22;
+      analyser.minDecibels=-100;
+      analyser.maxDecibels=-5;
 
       timeData=new Float32Array(analyser.fftSize);
       freqData=new Uint8Array(analyser.frequencyBinCount);
       src.connect(analyser);
 
       micReady=true;
-      calibrationUntil=performance.now()+750;
+      calibrationUntil=performance.now()+600;
       micBtn.style.display='none';
       meterWrap.style.display='block';
       hint.style.display='block';
@@ -600,8 +601,9 @@
     micReady=false;
     micBtn.textContent='💨 hold to blow';
     micBtn.classList.add('hold');
+    meterWrap.style.display='block';
     hint.style.display='block';
-    hint.textContent="(mic off — press & hold, or hold space)";
+    hint.textContent="(mic unavailable — press & hold, or hold space)";
 
     const down=(e)=>{ e.preventDefault(); holdActive=true; startBlowLoop(); };
     const up=()=>{ holdActive=false; };
@@ -622,39 +624,65 @@
   }
 
   function readBlow(){
-    if(holdActive) return {strength:.95,blowing:true};
-    if(!analyser || !timeData || !freqData) return {strength:0,blowing:false};
+    if(holdActive) return {strength:1,blowing:true};
+    if(!analyser || !timeData || !freqData || !audioCtx){
+      return {strength:0,blowing:false};
+    }
 
     analyser.getFloatTimeDomainData(timeData);
     analyser.getByteFrequencyData(freqData);
 
-    let sum=0;
-    for(let i=0;i<timeData.length;i++) sum+=timeData[i]*timeData[i];
+    /* Overall microphone loudness. */
+    let sum=0, peak=0;
+    for(let i=0;i<timeData.length;i++){
+      const v=Math.abs(timeData[i]);
+      sum+=v*v;
+      if(v>peak) peak=v;
+    }
     const rms=Math.sqrt(sum/timeData.length);
 
+    /* Blowing has a lot of high-frequency air. Use a broad range because
+       phone/tablet microphones process this very differently. */
     const binHz=audioCtx.sampleRate/analyser.fftSize;
+    const lo=Math.max(1,Math.floor(500/binHz));
+    const hi=Math.min(freqData.length-1,Math.floor(8000/binHz));
     let airSum=0, airCount=0;
-    const lo=Math.max(1,Math.floor(900/binHz));
-    const hi=Math.min(freqData.length-1,Math.floor(7000/binHz));
-    for(let i=lo;i<=hi;i++){ airSum+=freqData[i]; airCount++; }
+    for(let i=lo;i<=hi;i++){
+      airSum+=freqData[i];
+      airCount++;
+    }
     const air=airCount ? (airSum/airCount)/255 : 0;
 
     const now=performance.now();
+
     if(now<calibrationUntil){
-      noiseFloor=noiseFloor*.9+rms*.1;
+      noiseFloor=noiseFloor*.94+rms*.06;
       return {strength:0,blowing:false};
     }
-    noiseFloor=noiseFloor*.995+rms*.005;
 
-    const rmsThreshold=Math.max(.055,noiseFloor*2.7+.018);
-    const airThreshold=.095;
-    const strongRms=rms>rmsThreshold;
-    const strongAir=air>airThreshold;
+    /* Slowly follow room noise, but don't let it make the detector unusable. */
+    noiseFloor=noiseFloor*.997+rms*.003;
 
-    /* Detect a sustained breath, while allowing a strong burst on phones
-       whose microphones suppress the airy high frequencies. */
-    const blowing=(strongRms&&strongAir)||(rms>Math.max(.16,noiseFloor*5.2));
-    const strength=Math.min(1,Math.max(rms/rmsThreshold*.55,air/airThreshold*.65));
+    /* Forgiving thresholds for phone/tablet microphones. */
+    const rmsThreshold=Math.max(.018,noiseFloor*1.8+.006);
+    const airThreshold=Math.max(.045,noiseFloor*2.2+.025);
+
+    const loudEnough=rms>rmsThreshold;
+    const airyEnough=air>airThreshold;
+
+    /* Primary detection plus fallbacks for devices that suppress airy
+       frequencies aggressively. */
+    const blowing=(loudEnough && airyEnough) ||
+                  (rms>Math.max(.040,noiseFloor*3.8)) ||
+                  (air>Math.max(.085,airThreshold*1.35) && rms>.012);
+
+    const rmsStrength=Math.min(1,rms/(rmsThreshold*2.2));
+    const airStrength=Math.min(1,air/(airThreshold*2.0));
+    const peakStrength=Math.min(1,peak/.30);
+    const strength=Math.min(1,
+      Math.max(rmsStrength*.62,airStrength*.78,peakStrength*.25)
+    );
+
     return {strength,blowing};
   }
 
