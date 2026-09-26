@@ -107,29 +107,134 @@
   .opentab::after{ right:-6px; clip-path:polygon(0 0,100% 20%,100% 80%,0 100%);}
   .card.open .opentab{ opacity:0; }
 
-  /* ---------- PAGE 2 : letter (lives on the cover back) ---------- */
-  .page2{ position:absolute; inset:0; cursor:pointer; overflow:hidden; border-radius:5px 12px 12px 5px; }
-  .page2 .env{ position:absolute; inset:0; z-index:3; }
-  .letter{
-    position:absolute; left:50%; top:9%; width:76%;
+  /* ---------- PAGE 2 : envelope + cinematic letter ---------- */
+  .page2{
+    position:absolute; inset:0; cursor:pointer; overflow:visible;
+    border-radius:5px 12px 12px 5px;
+  }
+  .page2 .env{
+    position:absolute; inset:0; z-index:3; width:100%; height:100%;
+    object-fit:cover; pointer-events:auto;
+  }
+  .page2 .letter{
+    position:absolute; left:50%; top:9%; width:76%; height:auto;
     transform:translateX(-50%) translateY(38%) scale(.8) rotate(-1deg);
     transform-origin:center bottom;
-    transition:transform .7s cubic-bezier(.34,1.15,.4,1);
-    z-index:1; box-shadow:0 12px 26px rgba(40,15,8,.4); border-radius:3px;
+    z-index:1; box-shadow:0 12px 26px rgba(40,15,8,.4);
+    border-radius:3px; pointer-events:none;
   }
-  .page2.raised .letter{ z-index:6; }
-  .page2.open .letter{ transform:translateX(-50%) translateY(0%) scale(1) rotate(0deg); }
-  .page2 img.letter{ width:76%; height:auto; object-fit:fill; }
-  .ltab{
-    position:absolute; z-index:8; left:50%; bottom:5%; transform:translateX(-50%) rotate(-2deg);
-    background:var(--tape); color:var(--wine); font-family:'Gochi Hand',cursive;
-    font-size:clamp(11px,2.5vw,15px); padding:5px 12px; box-shadow:0 4px 9px rgba(40,15,8,.28);
-    transition:opacity .35s; pointer-events:none;
+
+  /* ---- Letter animation: exact reversible envelope <-> centre motion ---- */
+  .letter-modal{
+    position:fixed; inset:0; z-index:10000;
+    pointer-events:none; opacity:1;
+    background:rgba(34,17,12,.22);
+    backdrop-filter:blur(2px); -webkit-backdrop-filter:blur(2px);
+    transition:background .28s ease,opacity .28s ease;
   }
-  .ltab::before,.ltab::after{ content:""; position:absolute; top:0; bottom:0; width:11px; background:rgba(255,255,255,.28);}
-  .ltab::before{ left:-5px; clip-path:polygon(0 20%,100% 0,100% 100%,0 80%);}
-  .ltab::after{ right:-5px; clip-path:polygon(0 0,100% 20%,100% 80%,0 100%);}
-  .page2.open .ltab{ opacity:0; }
+  .letter-modal.opening,.letter-modal.open{pointer-events:auto;}
+  .letter-modal.closing{pointer-events:none;}
+
+  .letter-modal .modal-letter{
+    position:fixed;
+    left:50%; top:50%;
+    width:var(--fw);
+    height:auto;
+    max-width:90vw;
+    max-height:84vh;
+    margin:0;
+    display:block;
+    object-fit:contain;
+    transform:translate(-50%,-50%) rotate(0deg) scale(1);
+    transform-origin:center center;
+    border-radius:4px;
+    box-shadow:0 24px 70px rgba(30,12,7,.48);
+    opacity:1;
+    will-change:left,top,width,transform;
+  }
+
+  /* The OPEN animation starts at the exact envelope centre and ends at the
+     exact final letter position. No extra scale is applied, so the image
+     cannot get stuck at the tiny envelope size after animationend. */
+  .letter-modal.opening .modal-letter{
+    animation:letterIn 1.05s cubic-bezier(.22,.82,.2,1) forwards;
+  }
+  @keyframes letterIn{
+    0%{
+      left:var(--sx); top:var(--sy); width:var(--sw);
+      transform:translate(-50%,-50%) rotate(-8deg) scale(1);
+    }
+    55%{
+      left:calc(50% + 0px); top:calc(50% - 2vh); width:var(--fw);
+      transform:translate(-50%,-50%) rotate(2deg) scale(1.015);
+    }
+    78%{
+      transform:translate(-50%,-50%) rotate(-.8deg) scale(.995);
+    }
+    100%{
+      left:50%; top:50%; width:var(--fw);
+      transform:translate(-50%,-50%) rotate(0deg) scale(1);
+    }
+  }
+
+  /* CLOSE IS THE TRUE REVERSE: every endpoint is the same as OPEN's
+     starting geometry, so it visibly travels back into the envelope. */
+  .letter-modal.closing .modal-letter{
+    animation:letterOut 1.05s cubic-bezier(.7,0,.95,.35) forwards;
+  }
+  @keyframes letterOut{
+    0%{
+      left:50%; top:50%; width:var(--fw);
+      transform:translate(-50%,-50%) rotate(0deg) scale(1);
+    }
+    22%{
+      left:calc(50% + 0px); top:calc(50% - 2vh); width:var(--fw);
+      transform:translate(-50%,-50%) rotate(2deg) scale(1.015);
+    }
+    100%{
+      left:var(--sx); top:var(--sy); width:var(--sw);
+      transform:translate(-50%,-50%) rotate(-8deg) scale(1);
+    }
+  }
+
+  .letter-modal::after{
+    content:"tap the letter to close ♥";
+    position:fixed; left:50%; bottom:4%; transform:translateX(-50%);
+    color:#fff; font-family:'Gochi Hand',cursive;
+    font-size:clamp(13px,3.5vw,18px);
+    text-shadow:0 2px 7px rgba(0,0,0,.55);
+    opacity:0; transition:opacity .25s ease .55s;
+    pointer-events:none; white-space:nowrap;
+  }
+  .letter-modal.open::after{opacity:.9;}
+  .letter-modal.closing::after{opacity:0;transition:none;}
+
+  .letter-modal::before{
+    content:"♥"; position:fixed; left:var(--sx); top:var(--sy);
+    color:var(--pink); font-family:'Caveat',cursive;
+    font-size:clamp(28px,8vw,48px);
+    transform:translate(-50%,-50%) scale(.15);
+    opacity:0; pointer-events:none;
+  }
+  .letter-modal.closing::before{animation:envelopeHeart 1.05s ease-out forwards;}
+  @keyframes envelopeHeart{
+    0%,70%{opacity:0;transform:translate(-50%,-50%) scale(.15);}
+    82%{opacity:1;transform:translate(-50%,-50%) scale(1);}
+    100%{opacity:0;transform:translate(-50%,-50%) scale(1.45) translateY(-12px);}
+  }
+
+  @media (max-width:600px){
+    .letter-modal .modal-letter{
+      max-width:90vw;
+      max-height:84vh;
+    }
+  }
+  @media (min-width:601px){
+    .letter-modal .modal-letter{
+      max-width:min(72vw,560px);
+      max-height:84vh;
+    }
+  }
 
   /* ---------- PAGE 3 : candles ---------- */
   .page3{ position:absolute; inset:0; }
@@ -274,22 +379,101 @@
   function closeCard(){
     opened=false; card.classList.remove('open');
     backBtn.style.display='none';
-    closeLetter(); stopBlowLoop();
+    closeLetter(true); stopBlowLoop();
     if(!extinguished) flames.forEach(f=> f.style.setProperty('--bend','0deg'));
   }
 
   /* ---- letter ---- */
   const page2=document.getElementById('page2');
-  let letterOpen=false, tuck=null;
+  const sourceLetter=page2.querySelector('.letter');
+  let letterOpen=false, letterModal=null, letterBusy=false;
+
   page2.addEventListener('click',(e)=>{
     e.stopPropagation();
-    letterOpen ? closeLetter() : openLetter();
+    if(!letterOpen && !letterBusy) openLetter();
   });
-  function openLetter(){ letterOpen=true; clearTimeout(tuck); page2.classList.add('raised','open'); }
-  function closeLetter(){
-    if(!page2.classList.contains('open')){ page2.classList.remove('raised'); letterOpen=false; return; }
-    letterOpen=false; page2.classList.remove('open');
-    tuck=setTimeout(()=>page2.classList.remove('raised'), 720);
+
+  function getLetterGeometry(){
+    const env=page2.querySelector('.env').getBoundingClientRect();
+    const startW=Math.max(56, env.width*.30);
+
+    /* Letter image is portrait (1229 x 1536). Calculate its usable width
+       from BOTH viewport width and height so it is never clipped. */
+    const ratio=1229/1536;
+    const widthLimit=window.innerWidth*.90;
+    const heightLimit=window.innerHeight*.84*ratio;
+    const desktopLimit=Math.min(560,window.innerWidth*.72);
+    const finalW=Math.min(widthLimit,heightLimit,window.innerWidth>600?desktopLimit:widthLimit);
+
+    return {
+      x:env.left+env.width/2,
+      y:env.top+env.height/2,
+      w:startW,
+      finalW:Math.max(startW*1.5,finalW)
+    };
+  }
+
+  function openLetter(){
+    if(letterOpen || letterBusy) return;
+    letterOpen=true; letterBusy=true;
+    const g=getLetterGeometry();
+    const modal=document.createElement('div');
+    modal.className='letter-modal opening';
+    modal.style.setProperty('--sx',g.x+'px');
+    modal.style.setProperty('--sy',g.y+'px');
+    modal.style.setProperty('--sw',g.w+'px');
+    modal.style.setProperty('--fw',g.finalW+'px');
+
+    const img=sourceLetter.cloneNode(true);
+    img.className='modal-letter';
+    img.removeAttribute('id');
+    modal.appendChild(img);
+    document.body.appendChild(modal);
+    letterModal=modal;
+    sourceLetter.style.visibility='hidden';
+
+    img.addEventListener('click',(e)=>{
+      e.stopPropagation();
+      if(!modal.classList.contains('closing')) closeLetter();
+    });
+    modal.addEventListener('click',(e)=>{e.stopPropagation();});
+
+    img.addEventListener('animationend',(e)=>{
+      if(e.animationName==='letterIn'){
+        modal.classList.remove('opening');
+        modal.classList.add('open');
+        letterBusy=false;
+      }
+    },{once:false});
+  }
+
+  function closeLetter(force=false){
+    if(!letterModal){letterOpen=false;sourceLetter.style.visibility='';return;}
+    const modal=letterModal;
+    if(force){
+      modal.remove(); letterModal=null; letterOpen=false; letterBusy=false; sourceLetter.style.visibility='';
+      return;
+    }
+    if(modal.classList.contains('closing')) return;
+    letterOpen=false; letterBusy=true;
+
+    /* Recalculate the envelope position at the instant of closing so the
+       letter always returns to the exact place it came from, even after resize. */
+    const g=getLetterGeometry();
+    modal.style.setProperty('--sx',g.x+'px');
+    modal.style.setProperty('--sy',g.y+'px');
+    modal.style.setProperty('--sw',g.w+'px');
+    modal.style.setProperty('--fw',g.finalW+'px');
+    modal.classList.remove('open','opening');
+    void modal.offsetWidth;
+    modal.classList.add('closing');
+
+    setTimeout(()=>{
+      if(modal.parentNode) modal.remove();
+      if(letterModal===modal) letterModal=null;
+      sourceLetter.style.visibility='';
+      letterBusy=false;
+    },1050);
   }
 
   /* ---- candles / blow ---- */
